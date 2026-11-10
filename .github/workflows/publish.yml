@@ -1,0 +1,28 @@
+# Новая сборка приходит пушем в ветку incoming (app-release.apk + notes.txt) — отсюда она становится
+# релизом build-N, который видит приложение. Ветка incoming после этого удаляется: APK не копятся в истории.
+name: Опубликовать сборку
+
+on:
+  push:
+    branches: [incoming]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: incoming
+      - name: Релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BUILD=$(cat build.txt)
+          case "$BUILD" in ''|*[!0-9]*) echo "плохой номер сборки"; exit 1;; esac
+          sha256sum app-release.apk > app-release.apk.sha256
+          gh release create "build-$BUILD" app-release.apk app-release.apk.sha256 \
+            --target main --title "Сборка $BUILD" --notes-file notes.txt
+          git push origin --delete incoming
