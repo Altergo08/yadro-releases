@@ -1,0 +1,426 @@
+{
+  "yadro": 1,
+  "name": "station-scene",
+  "about": "Живая станция Oukitel BP3000E на главном экране. Хозяин кладёт значения: online, grid, silent, charging, percent, inW, outW, fanPower; сигналы: toBattery, gridOn, lost, poke; касания отдаёт в Scene.tap и Loaded.tap. Компоненты — StationParts в приложении.",
+  "camera": {
+    "target": [
+      0,
+      0.6,
+      0
+    ],
+    "distance": 4.2,
+    "yaw": -0.5,
+    "pitch": 0.3,
+    "home": true
+  },
+  "models": {
+    "bp3000e": "engine/station.yms",
+    "stab": "engine/stabilizer.yms"
+  },
+  "surfaces": {
+    "shell": {"pattern": "grain", "scale": 0.3, "strength": 0.5, "bump": 1.2},
+    "body": {"pattern": "cast", "scale": 0.5, "strength": 0.6, "bump": 1.0},
+    "bp3000e:trim": {"pattern": "brushed", "scale": 0.5, "strength": 0.7, "bump": 0.4},
+    "rubber": {"pattern": "knurl", "scale": 0.12, "strength": 0.8, "bump": 2.0},
+    "accent": {"pattern": "grain", "scale": 0.15, "strength": 0.4, "bump": 0.4}
+  },
+  "clips": {
+    "open": {
+      "duration": 0.5,
+      "tracks": [
+        {
+          "property": "ROT_X",
+          "ease": "OUT_BACK",
+          "keys": [
+            0,
+            0,
+            0.5,
+            -1.75
+          ]
+        }
+      ],
+      "marks": [
+        {
+          "time": 0.03,
+          "sound": "lid"
+        }
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "name": "stabilizer",
+      "about": "Стабилизатор на стене: сеть → стабилизатор → станция. Лампа «включено» и клавиша горят, пока есть свет; лампы «повышает»/«понижает» — пока не знаем напряжения сети, не горят.",
+      "model": "stab",
+      "style": "SOLID",
+      "fill": 0.07,
+      "position": [-0.95, 0.75, -0.75],
+      "parts": {
+        "led_power_on": {"visible": {"value": "grid", "above": 0.5}, "components": [
+          {"type": "Light", "color": "#3CFF64", "intensity": 0.5, "range": 0.25, "offset": [0, 0, 0.015], "size": 0.006}
+        ]},
+        "switch_on": {"visible": {"value": "grid", "above": 0.5}},
+        "led_raise_on": {"visible": false},
+        "led_lower_on": {"visible": false}
+      }
+    },
+    {
+      "name": "station",
+      "model": "bp3000e",
+      "style": "SOLID",
+      "fill": 0.07,
+      "behaviours": [
+        {
+          "type": "sway",
+          "axis": 1,
+          "amount": 0.07,
+          "hz": 0.0875
+        }
+      ],
+      "components": [
+        {
+          "type": "Glow"
+        },
+        {
+          "type": "Static"
+        }
+      ],
+      "parts": {
+        "body": {
+          "components": [
+            {
+              "type": "Lcd"
+            },
+            {
+              "type": "StatusLed"
+            },
+            {
+              "type": "PlugSparks",
+              "particles": "sparks",
+              "count": 34
+            }
+          ]
+        },
+        "fan_*_0": {
+          "behaviours": [
+            {
+              "type": "spin",
+              "axis": 0,
+              "smooth": 1.2,
+              "speed": {
+                "value": "fanPower",
+                "below": 60,
+                "offset": 7.5398,
+                "scale": 0.009817,
+                "min": 0,
+                "max": 38.956
+              }
+            }
+          ]
+        },
+        "fan_*_1": {
+          "behaviours": [
+            {
+              "type": "spin",
+              "axis": 0,
+              "smooth": 1.2,
+              "speed": {
+                "value": "fanPower",
+                "below": 60,
+                "offset": -8.0676,
+                "scale": -0.010505,
+                "min": -41.683,
+                "max": 0
+              }
+            }
+          ]
+        },
+        "cable": {
+          "visible": {
+            "value": "grid",
+            "above": 0.5
+          }
+        },
+        "cable_cord": {"visible": false},
+        "socket_*": {
+          "visible": false
+        },
+        "lid_*": {
+          "onTap": {
+            "play": "open",
+            "hold": 5,
+            "close": 1.6,
+            "reveal": "socket_{n}"
+          }
+        }
+      }
+    },
+    {
+      "name": "cord",
+      "about": "Живой шнур от вилки станции к полу (компонент движка Cable): провисает, качается, когда станция покачивается. Только когда есть свет — как и вилка. Запечённый шнур модели (cable_cord) спрятан.",
+      "visible": {"value": "grid", "above": 0.5},
+      "components": [
+        {"type": "Cable", "from": "station:plug", "to": [1.3, 0.024, -0.55], "points": 20, "slack": 1.12,
+         "radius": 0.022, "floor": 0, "color": [0.012, 0.012, 0.016]}
+      ]
+    },
+    {
+      "name": "logic",
+      "about": "Граф (свой Blueprint): дали свет — лампа «включено» стабилизатора дважды мигает, держится ярко и плавно гаснет до обычной.",
+      "components": [
+        {"type": "Graph",
+         "nodes": {
+           "power": {"type": "signal", "name": "gridOn", "pos": [20, 20]},
+           "flash": {"type": "bright", "node": "led_power_on", "to": 1.4, "seconds": 0.06, "pos": [240, 20]},
+           "w1": {"type": "delay", "seconds": 0.15, "pos": [460, 20]},
+           "dim": {"type": "bright", "node": "led_power_on", "to": 0.15, "seconds": 0.06, "pos": [680, 20]},
+           "w2": {"type": "delay", "seconds": 0.15, "pos": [900, 20]},
+           "flash2": {"type": "bright", "node": "led_power_on", "to": 1.4, "seconds": 0.06, "pos": [240, 110]},
+           "hold": {"type": "delay", "seconds": 0.9, "pos": [460, 110]},
+           "calm": {"type": "bright", "node": "led_power_on", "to": 1, "seconds": 1.2, "pos": [680, 110]}
+         },
+         "wires": [["power.out", "flash.in"], ["flash.out", "w1.in"], ["w1.out", "dim.in"], ["dim.out", "w2.in"],
+           ["w2.out", "flash2.in"], ["flash2.out", "hold.in"], ["hold.out", "calm.in"]]}
+      ]
+    },
+    {
+      "name": "sparks",
+      "particles": {
+        "capacity": 96,
+        "floor": 0,
+        "gravity": [
+          0,
+          -3.2,
+          0
+        ]
+      },
+      "components": [
+        {"type": "Light", "about": "Вспышка от искр у вилки: тёплый свет на вилку, шнур и пол, гаснет вместе с искрами.",
+         "particles": true, "norm": 20, "color": "#FFB04A", "intensity": 3, "range": 0.7, "size": 0.03}
+      ]
+    }
+  ],
+  "tapParts": {
+    "ac_out": {
+      "nearest": "lid_*",
+      "within": 0.2
+    }
+  },
+  "labels": {
+    "stabilizer": {"ru": ["СТАБИЛИЗАТОР", "СЕТЬ → СТАБИЛИЗАТОР → СТАНЦИЯ"], "uk": ["СТАБІЛІЗАТОР", "МЕРЕЖА → СТАБІЛІЗАТОР → СТАНЦІЯ"]},
+    "led_power": {"ru": ["ВКЛЮЧЕНО", "НА СТАБИЛИЗАТОР ПРИХОДИТ СЕТЬ"], "uk": ["УВІМКНЕНО", "НА СТАБІЛІЗАТОР ПРИХОДИТЬ МЕРЕЖА"]},
+    "led_raise": {"ru": ["ПОВЫШАЕТ", "СЕТЬ НИЖЕ НОРМЫ"], "uk": ["ПІДВИЩУЄ", "МЕРЕЖА НИЖЧЕ НОРМИ"]},
+    "led_lower": {"ru": ["ПОНИЖАЕТ", "СЕТЬ ВЫШЕ НОРМЫ"], "uk": ["ЗНИЖУЄ", "МЕРЕЖА ВИЩЕ НОРМИ"]},
+    "switch": {"ru": ["ВКЛ / ВЫКЛ", "КЛАВИША СТАБИЛИЗАТОРА"], "uk": ["УВІМК / ВИМК", "КЛАВІША СТАБІЛІЗАТОРА"]},
+    "body": {
+      "ru": [
+        "OUKITEL BP3000E",
+        "3200 ВТ · 2048 ВТ·Ч"
+      ],
+      "uk": [
+        "OUKITEL BP3000E",
+        "3200 ВТ · 2048 ВТ·ГОД"
+      ]
+    },
+    "display": {
+      "ru": [
+        "ЭКРАН",
+        "ЗАРЯД · ВХОД · ВЫХОД"
+      ],
+      "uk": [
+        "ЕКРАН",
+        "ЗАРЯД · ВХІД · ВИХІД"
+      ]
+    },
+    "power": {
+      "ru": [
+        "КНОПКА ПИТАНИЯ",
+        "ВКЛ / ВЫКЛ"
+      ],
+      "uk": [
+        "КНОПКА ЖИВЛЕННЯ",
+        "УВІМК / ВИМК"
+      ]
+    },
+    "dc_car": {
+      "ru": [
+        "ПРИКУРИВАТЕЛЬ И DC",
+        "12 В · ДО 10 А"
+      ],
+      "uk": [
+        "ПРИКУРЮВАЧ І DC",
+        "12 В · ДО 10 А"
+      ]
+    },
+    "dc_5521": {
+      "ru": [
+        "DC 5521 · 2 ШТ",
+        "12 В · 3 А"
+      ],
+      "uk": [
+        "DC 5521 · 2 ШТ",
+        "12 В · 3 А"
+      ]
+    },
+    "usb_a": {
+      "ru": [
+        "USB-A · 2 ШТ",
+        "12 ВТ"
+      ],
+      "uk": [
+        "USB-A · 2 ШТ",
+        "12 ВТ"
+      ]
+    },
+    "usb_qc": {
+      "ru": [
+        "USB-A QC3.0 · 2 ШТ",
+        "18 ВТ, БЫСТРАЯ"
+      ],
+      "uk": [
+        "USB-A QC3.0 · 2 ШТ",
+        "18 ВТ, ШВИДКА"
+      ]
+    },
+    "usb_c": {
+      "ru": [
+        "USB-C PD · 2 ШТ",
+        "ДО 100 ВТ"
+      ],
+      "uk": [
+        "USB-C PD · 2 ШТ",
+        "ДО 100 ВТ"
+      ]
+    },
+    "ac_out": {
+      "ru": [
+        "РОЗЕТКИ 220 В · 4 ШТ",
+        "ВСЕГО ДО 3200 ВТ"
+      ],
+      "uk": [
+        "РОЗЕТКИ 220 В · 4 ШТ",
+        "УСЬОГО ДО 3200 ВТ"
+      ]
+    },
+    "logo": {
+      "ru": [
+        "OUKITEL BP3000E",
+        "ЁМКОСТЬ 2048 ВТ·Ч"
+      ],
+      "uk": [
+        "OUKITEL BP3000E",
+        "ЄМНІСТЬ 2048 ВТ·ГОД"
+      ]
+    },
+    "handle": {
+      "ru": [
+        "РУЧКА",
+        "СТАНЦИЯ 24 КГ"
+      ],
+      "uk": [
+        "РУЧКА",
+        "СТАНЦІЯ 24 КГ"
+      ]
+    },
+    "fan": {
+      "ru": [
+        "ВЕНТИЛЯТОРЫ",
+        "НЕ ЗАКРЫВАТЬ"
+      ],
+      "uk": [
+        "ВЕНТИЛЯТОРИ",
+        "НЕ ЗАКРИВАТИ"
+      ]
+    },
+    "inputs": {
+      "ru": [
+        "ВХОДЫ",
+        "СЕТЬ · СОЛНЦЕ · АВТО"
+      ],
+      "uk": [
+        "ВХОДИ",
+        "МЕРЕЖА · СОНЦЕ · АВТО"
+      ]
+    },
+    "overload": {
+      "ru": [
+        "ЗАЩИТА",
+        "ОТ ПЕРЕГРУЗКИ"
+      ],
+      "uk": [
+        "ЗАХИСТ",
+        "ВІД ПЕРЕВАНТАЖЕННЯ"
+      ]
+    },
+    "ac_in": {
+      "ru": [
+        "ВХОД ОТ СЕТИ",
+        "ЗАРЯД ДО 2000 ВТ"
+      ],
+      "uk": [
+        "ВХІД ВІД МЕРЕЖІ",
+        "ЗАРЯД ДО 2000 ВТ"
+      ]
+    },
+    "charge_speed": {
+      "ru": [
+        "СКОРОСТЬ ЗАРЯДА",
+        "БЫСТРО / ТИХО"
+      ],
+      "uk": [
+        "ШВИДКІСТЬ ЗАРЯДУ",
+        "ШВИДКО / ТИХО"
+      ]
+    },
+    "xt60": {
+      "ru": [
+        "СОЛНЦЕ / АВТО XT60",
+        "ДО 1000 ВТ"
+      ],
+      "uk": [
+        "СОНЦЕ / АВТО XT60",
+        "ДО 1000 ВТ"
+      ]
+    },
+    "expansion": {
+      "ru": [
+        "БАТАРЕЯ РАСШИРЕНИЯ",
+        "ДОП. МОДУЛЬ B2000L"
+      ],
+      "uk": [
+        "БАТАРЕЯ РОЗШИРЕННЯ",
+        "ДОД. МОДУЛЬ B2000L"
+      ]
+    },
+    "plate": {
+      "ru": [
+        "ТАБЛИЧКА",
+        "3200 ВТ · 2048 ВТ·Ч"
+      ],
+      "uk": [
+        "ТАБЛИЧКА",
+        "3200 ВТ · 2048 ВТ·ГОД"
+      ]
+    },
+    "top": {
+      "ru": [
+        "КРЫШКА",
+        "ВЕРХ СТАНЦИИ"
+      ],
+      "uk": [
+        "КРИШКА",
+        "ВЕРХ СТАНЦІЇ"
+      ]
+    },
+    "cable": {
+      "ru": [
+        "ШНУР ОТ СЕТИ",
+        "СВЕТ ЕСТЬ"
+      ],
+      "uk": [
+        "ШНУР ВІД МЕРЕЖІ",
+        "СВІТЛО Є"
+      ]
+    }
+  }
+}
